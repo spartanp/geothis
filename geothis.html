@@ -1,0 +1,88 @@
+<html>
+    <body>
+
+    <script type="text/javascript">
+    var geothis = {
+        
+        // send message to the page.
+        sendMessage: function(name, data) {
+            var page = safari.application.activeBrowserWindow.activeTab.page;
+            page.dispatchMessage(name, data);
+        },
+        
+        // command listener.
+        handleApplicationCommand: function (e) {
+            var command = e.command;
+
+            switch (command) {
+                case "geothis": 
+                    geothis.sendMessage("getUrl");
+                    break;
+
+                default:
+                    break;
+            }
+        },
+
+        /**
+         * handle messages from the injected script.
+         */
+        handleMessage: function(e) {
+            var name = e.name;
+
+            switch (name) {
+                case "getMatchesForUrl":
+                    geothis.fetchGeoMatchesForUrl(e.message.url);
+                    break;
+
+                default:
+                    break;
+            }
+        },
+
+        /**
+         * Fetches the geo matches for current document. This is done via jsonp.
+         */
+        fetchGeoMatchesForUrl: function(documentUrl) {
+            var yql = 'select * from geo.placemaker where '+
+                  'documentURL ="' + documentUrl + 
+                  '" and ' + 
+                  'documentType="text/html" and appid=""';
+            var url = 'http://query.yahooapis.com/v1/public/yql?q=' +
+                 encodeURIComponent(yql) + 
+                 '&format=json';
+            geothis.doXhr(url, geothis.processMatches);
+        },
+
+        doXhr: function(url, callback) {
+            var xhr = new XMLHttpRequest();
+            xhr.open("GET", url, true);
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState == 4) {
+                    callback(xhr);
+                }
+            }
+            xhr.send();
+        },
+
+        processMatches: function(response) {
+            var data = JSON.parse(response.responseText);
+            if (data.query.results && 
+                data.query.results.matches &&  
+                data.query.results.matches.match) {
+                
+                var results = data.query.results.matches.match;
+                geothis.sendMessage("renderMatches", results);
+            }
+        }
+ 
+    };
+
+    // message and commmand listeners.
+    safari.application.addEventListener("command",
+        geothis.handleApplicationCommand, false);
+    safari.application.addEventListener("message",
+        geothis.handleMessage, false);
+    </script>
+    </body>
+</html>
